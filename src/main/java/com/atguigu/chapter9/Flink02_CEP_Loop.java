@@ -19,7 +19,7 @@ import java.util.Map;
  * @author coderhyh
  * @create 2022-04-02 12:31
  */
-class Flink01_CEP_BasicUse {
+class Flink02_CEP_Loop {
     public static void main(String[] args) throws Exception {
         //获取流的执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -45,7 +45,12 @@ class Flink01_CEP_BasicUse {
                         return "sensor_1".equals(value.getId());
                     }
                 })
-                .times(2);
+                //.times(2); //循环模式：固定次数：表示id=sensor_1要出现三次才满足s1
+                //.times(2, 4); //使用量词 [2,4]   匹配2次,3次或4次
+                //.oneOrMore(); // 一次或多次
+                //.timesOrMore(2);  //多次及多次以上
+                //.times(2).consecutive();//严格next
+                .allowCombinations();// 非确定的松散连续
 
         //在流上应用模式
         PatternStream<WaterSensor> ps = CEP.pattern(stream, pattern);

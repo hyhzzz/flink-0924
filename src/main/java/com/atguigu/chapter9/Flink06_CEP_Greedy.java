@@ -19,7 +19,7 @@ import java.util.Map;
  * @author coderhyh
  * @create 2022-04-02 12:31
  */
-class Flink01_CEP_BasicUse {
+class Flink06_CEP_Greedy {
     public static void main(String[] args) throws Exception {
         //获取流的执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -45,7 +45,13 @@ class Flink01_CEP_BasicUse {
                         return "sensor_1".equals(value.getId());
                     }
                 })
-                .times(2);
+                .next("s2").times(2,3).greedy()
+                .where(new SimpleCondition<WaterSensor>() {
+                    @Override
+                    public boolean filter(WaterSensor waterSensor) throws Exception {
+                        return "sensor_2".equals(waterSensor.getId());
+                    }
+                });
 
         //在流上应用模式
         PatternStream<WaterSensor> ps = CEP.pattern(stream, pattern);

@@ -6,20 +6,22 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.cep.CEP;
 import org.apache.flink.cep.PatternSelectFunction;
 import org.apache.flink.cep.PatternStream;
+import org.apache.flink.cep.PatternTimeoutFunction;
+import org.apache.flink.cep.pattern.GroupPattern;
 import org.apache.flink.cep.pattern.Pattern;
 import org.apache.flink.cep.pattern.conditions.SimpleCondition;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.util.OutputTag;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
 
 /**
  * @author coderhyh
  * @create 2022-04-02 12:31
  */
-class Flink01_CEP_BasicUse {
+class Flink07_CEP_PaternGroup_WithIn {
     public static void main(String[] args) throws Exception {
         //获取流的执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -38,26 +40,40 @@ class Flink01_CEP_BasicUse {
                         .withTimestampAssigner((element, recordTimestamp) -> element.getTs()));
 
         //定义模式
-        Pattern<WaterSensor, WaterSensor> pattern = Pattern.<WaterSensor>begin("s1")
+        GroupPattern<WaterSensor, WaterSensor> pattern = Pattern.begin(Pattern.<WaterSensor>begin("s1")
                 .where(new SimpleCondition<WaterSensor>() {
                     @Override
-                    public boolean filter(WaterSensor value) throws Exception {
-                        return "sensor_1".equals(value.getId());
+                    public boolean filter(WaterSensor waterSensor) throws Exception {
+                        return "sensor_1".equals(waterSensor.getId());
                     }
                 })
-                .times(2);
+                .next("s2")
+                .where(new SimpleCondition<WaterSensor>() {
+                    @Override
+                    public boolean filter(WaterSensor waterSensor) throws Exception {
+                        return "sensor_2".equals(waterSensor.getId());
+                    }
+                })
+                //.times(2)
+                //超时数据
+                .within(Time.seconds(2))
+        );
 
         //在流上应用模式
         PatternStream<WaterSensor> ps = CEP.pattern(stream, pattern);
 
         //获取匹配到的结果
-        ps.select(new PatternSelectFunction<WaterSensor, String>() {
-            //每匹配成功一次，这个方法就执行一次
-            @Override
-            public String select(Map<String, List<WaterSensor>> map) throws Exception {
-                return map.toString();
-            }
-        }).print();
+        //参数就是匹配的时候，超时的数据
+//返回值就是要放入侧输出流的数据
+        SingleOutputStreamOperator<String> normal = ps.select(
+                new OutputTag<WaterSensor>("timeout") {
+                }, (PatternTimeoutFunction<WaterSensor, WaterSensor>) (map, l) -> map.get("s1").get(0),
+                (PatternSelectFunction<WaterSensor, String>) map -> map.toString());
+
+        normal.print("匹配成功...");
+        normal.getSideOutput(new OutputTag<WaterSensor>("timeout") {
+        }).print("timeout");
+
 
         //启动执行环境
         env.execute();

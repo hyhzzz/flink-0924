@@ -19,7 +19,7 @@ import java.util.Map;
  * @author coderhyh
  * @create 2022-04-02 12:31
  */
-class Flink01_CEP_BasicUse {
+class Flink04_CEP_Loop_until {
     public static void main(String[] args) throws Exception {
         //获取流的执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -45,7 +45,14 @@ class Flink01_CEP_BasicUse {
                         return "sensor_1".equals(value.getId());
                     }
                 })
-                .times(2);
+                //停止条件 ：一般用在timesOrMore和oneOrMore的后面
+                .timesOrMore(2)//2次或者2次以上
+                .until(new SimpleCondition<WaterSensor>() {
+                    @Override
+                    public boolean filter(WaterSensor waterSensor) throws Exception {
+                        return waterSensor.getVc() >= 40;
+                    }
+                });
 
         //在流上应用模式
         PatternStream<WaterSensor> ps = CEP.pattern(stream, pattern);
